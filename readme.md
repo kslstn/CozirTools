@@ -21,4 +21,8 @@ Streaming is the factory default.
 - [CoZIR Software user guide](www.airtest.com/support/datasheet/COZIRSerialInterface.pdf) contains the documentation for the serial interface.
 
 #Dependencies#
-The tools use [Rob Tillaart's Cozir Library](https://github.com/RobTillaart/Arduino/tree/master/libraries/Cozir). [To install](arduino.cc/en/Guide/Libraries) that library, download it to your Arduino/library folder and restart the Arduino IDE. 
+- The tools use [Rob Tillaart's Cozir Library](https://github.com/RobTillaart/Arduino/tree/master/libraries/Cozir).
+- The logger tools require the [Time library](https://github.com/PaulStoffregen/Time)
+- The loggers also need the [Average library](https://github.com/MajenkoLibraries/Average).
+
+[To install](arduino.cc/en/Guide/Libraries) libraries, download it to your Arduino/library folder and restart the Arduino IDE. 
