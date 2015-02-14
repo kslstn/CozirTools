@@ -3,8 +3,10 @@
  
   This sketch sents values temperature, humidity, CO2 and the digital filter setting to the serial port in CSV format.
   After uploading, open the serial monitor (ctrl+shift+m) and follow instructions. The CSV data can be copied and pasted into a spreadsheet.
-  In order to keep memory and storage consumption low, but not average out extremes, the sketch polls 30 times as often as it logs. With every log entry, the extremes and the averages of those 30 measurements are recorded.  
- 
+  In order to keep memory and storage consumption low, but not average out extremes, the sketch polls more frequently than it logs.
+  As the log is kept in RAM, only a around 9 data points can be recorded. As opening the serial monitor resets the Arduino, logs can only be read if the computer is connected the whole logging period. Until I have a datalogger shield, it's something at least.
+  When memory is full, logs are no longer saved. Some messy last entries may show up.
+
   created 13 Feb 2015
   by Koos Looijesteijn
  
@@ -35,11 +37,12 @@
 SoftwareSerial nss(2,3); // Pin 2 = Arduino receiver pin (Rx), connect to sensor transmitter pin (Tx). Pin 3 = Arduino Tx, connect it to sensor Rx.
 COZIR czr(nss);
 
+// We poll more often than we log, so we can register some extremes occurring during the logging intervals without having to log huge amounts of data.
+const byte MEASUREMENTS_PER_LOG = 10;
 // Set measure and log intervals
-const byte MEASUREMENTS_PER_LOG = 30; // We poll more often than we record, so we can register the extremes without having to log huge amounts of data.
-byte pollingInterval = 1; // In seconds.  It takes about 30s for big changes even to be picked up by the sensor, so this number can stay high.
+const byte pollingInterval = 600; // In seconds. This number can stay high. It takes about 30s for big changes even to be picked up as a small difference by the sensor.
 byte pollingLoopCounter = 0;
-byte logInterval = MEASUREMENTS_PER_LOG*pollingInterval; // In seconds. This defines how often logs are saved.
+const byte logInterval = MEASUREMENTS_PER_LOG*pollingInterval; // In seconds. This defines how much time is between each log. It's not accurate.
 byte logLoopCounter = 0;
 
 // Special declaration for variables that are averaged with the Average library.
@@ -47,30 +50,24 @@ Average<float> temperatures(MEASUREMENTS_PER_LOG);
 Average<float> humidity(MEASUREMENTS_PER_LOG);
 Average<int> CO2(MEASUREMENTS_PER_LOG);
 
-// This will contain the measurement and now gets the CSV headings:
-String sLog = "Time,Temperature (low),Temperature,Temperature (high),Humidity (low),Humidity,Humidity (high),Carbon Dioxide (high),Carbon Dioxide,Carbon Dioxide (low)\r\n";
-
-// LED indicates when the clock needs to be reset
-const byte LED = 13;
+// This will contain the log:
+String sLog;
 
 /****************************
  Setup
 /****************************/
 void setup(){
-  pinMode(LED, OUTPUT); // LED needs pin set to output
   Serial.begin(9600); // Start communication over serial port.
   //setSyncProvider( requestSync );  //set function to call when sync required
-  Serial.println("\r\nPlease enter the current Unix time, for instance: 1423856136\r\n");// You can find the current time stamp on unixtimestamp.com
+  Serial.println("\r\nPlease enter the current Unix time, for instance: 1420070400\r\n");// You can find the current time stamp on unixtimestamp.com
 }
 
 /****************************
  Loop
 /****************************/
 void loop(){
-  
+
   if (timeStatus() == timeSet) {
-    digitalWrite(LED, LOW); // Turn off LED when clock is set
-    //TODO klopt dat wel
     if ( pollingLoopCounter == pollingInterval ){
       pollData();
       pollingLoopCounter = 0;
@@ -86,7 +83,6 @@ void loop(){
     }
   }
   else {
-    digitalWrite(LED, HIGH); // Turn on LED when clock needs to be se
     if (Serial.available()) {
       processDateInput();   
     }
@@ -97,7 +93,7 @@ void loop(){
 /****************************
  Functions called from Loop
 /****************************/
-// Process serial monitor commands
+// Process date commands
 void processDateInput() {
   unsigned long pctime;
   const unsigned long DEFAULT_TIME = 1357041600; // Jan 1 2013    
@@ -111,6 +107,7 @@ void processDateInput() {
     Serial.println("What?");
   }     
 }
+// Process serial monitor commands
 void processSerialCommandInput() {
   String userInputMsg = "";
   char character;
@@ -123,11 +120,18 @@ void processSerialCommandInput() {
     Serial.println("- " + userInputMsg + "\r\n");
   }
   if( userInputMsg == "csv" ){ // User requests CSV
-    Serial.println(sLog);
+    if ( sLog.length() > 0){
+      Serial.println("Time,Temperature (low),Temperature,Temperature (high),Humidity (low),Humidity,Humidity (high),Carbon Dioxide (low),Carbon Dioxide,Carbon Dioxide (high)");
+      Serial.println(sLog);
+    }
+    else{
+      Serial.println("Try again in a bit.");
+    }
   }  
 }
 // Polling - requesting measurements from the sensor
 void pollData(){
+  // Measurements are pushed in arrays for each measurement type:
   temperatures.push(czr.Celsius());
   humidity.push(czr.Humidity());
   CO2.push(czr.CO2());
@@ -135,6 +139,7 @@ void pollData(){
 // Logging of measurements
 void logData(){
   String sTime = getTimeString();
+  // Get for temperature, humidity and CO2 the lowest, average and highest measurements of the last logging interval:
   String sTemperatureMin = floatToString( temperatures.minimum() );
   String sTemperatureAvg = floatToString( temperatures.mean() );
   String sTemperatureMax = floatToString( temperatures.maximum() );
@@ -144,6 +149,7 @@ void logData(){
   String sCO2Min = floatToString( CO2.minimum() );
   String sCO2Avg = floatToString( CO2.mean() );
   String sCO2Max = floatToString( CO2.maximum() );
+  // Append the values to the log variable:
   sLog += sTime + "," + sTemperatureMin + "," + sTemperatureAvg + "," + sTemperatureMax + "," + sHumidityMin + "," + sHumidityAvg + "," + sHumidityMax + "," + sCO2Min + "," + sCO2Avg + "," + sCO2Max + "\r\n" ; // Append all measurements to the string
 }
 // Returns time as string
@@ -168,5 +174,3 @@ String floatToString(float f){
   s += buff;
   return s;
 }
-
-
