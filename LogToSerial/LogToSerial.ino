@@ -35,7 +35,7 @@ void loop()
   int c = czr.CO2();
   int digi = czr.GetDigiFilter();
 
-  Serial.print("Celcius : ");Serial.println(t);
+  Serial.print("Celsius : ");Serial.println(t);
   Serial.print("Fahrenheit : ");Serial.println(f);
   Serial.print("Humidity : ");Serial.println(h);
   Serial.print("CO2 : ");Serial.println(c);
