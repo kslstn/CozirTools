@@ -3,8 +3,10 @@ This is a set of Arduino sketches to make use of the CoZIR gas sensors. These se
 #Tools#
 ###Calibrate###
 Commands the sensor to calibrate itself. To be used when the sensor is surrounded by fresh air.
+###LogToCSV###
+Polls the sensor and logs average and extreme measurements at fixed intervals. Via the serial monitor (USB) the log can be requested as CSV, that can be copied to a spreadsheet. About nine logs can be made before the memory is full. As soon as I have a datalogger shield, I will make sketch for creating bigger logs.
 ###LogToSerial###
-Gets the sensor's measurements and sends these to the serial port (USB).
+Gets the sensor's measurements and sends these to the serial port.
 ###SetDigiFilter###
 The digital filter can be adjusted to filter out noise in the measurements
 ###SetToPolling###
