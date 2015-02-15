@@ -38,11 +38,11 @@ SoftwareSerial nss(2,3); // Pin 2 = Arduino receiver pin (Rx), connect to sensor
 COZIR czr(nss);
 
 // We poll more often than we log, so we can register some extremes occurring during the logging intervals without having to log huge amounts of data.
+const int LOG_INTERVAL = 60; // In seconds. This defines how much time is between each log. It's not accurate.
 const byte MEASUREMENTS_PER_LOG = 10;
 // Set measure and log intervals
-const byte pollingInterval = 600; // In seconds. This number can stay high. It takes about 30s for big changes even to be picked up as a small difference by the sensor.
+const int POLLING_INTERVAL = LOG_INTERVAL / MEASUREMENTS_PER_LOG; // In seconds. This number can stay high. It takes about 30s for big changes even to be picked up as a small difference by the sensor.
 byte pollingLoopCounter = 0;
-const byte logInterval = MEASUREMENTS_PER_LOG*pollingInterval; // In seconds. This defines how much time is between each log. It's not accurate.
 byte logLoopCounter = 0;
 
 // Special declaration for variables that are averaged with the Average library.
@@ -59,7 +59,7 @@ String sLog;
 void setup(){
   Serial.begin(9600); // Start communication over serial port.
   //setSyncProvider( requestSync );  //set function to call when sync required
-  Serial.println("\r\nPlease enter the current Unix time, for instance: 1420070400\r\n");// You can find the current time stamp on unixtimestamp.com
+  Serial.println("\r\n> Please enter the current Unix time, for instance: 1420070400\r\n");// You can find the current time stamp on unixtimestamp.com
 }
 
 /****************************
@@ -68,12 +68,12 @@ void setup(){
 void loop(){
 
   if (timeStatus() == timeSet) {
-    if ( pollingLoopCounter == pollingInterval ){
+    if ( pollingLoopCounter == POLLING_INTERVAL ){
       pollData();
       pollingLoopCounter = 0;
     }
     pollingLoopCounter++;
-    if ( logLoopCounter == logInterval ){
+    if ( logLoopCounter == LOG_INTERVAL ){
       logData();
       logLoopCounter = 0;
     }
@@ -101,10 +101,10 @@ void processDateInput() {
   Serial.println("- " + String(pctime) + "\r\n");
   if( pctime >= DEFAULT_TIME ){ // check the integer is a valid time (greater than Jan 1 2013)
     setTime(pctime); // Sync Arduino clock to the time received on the serial port
-    Serial.println("Tnx, logging will start. Type 'csv' to get the log data.\r\n");
+    Serial.println("> Tnx, logging will start. Type 'csv' to get the log data.\r\n");
   }
   else{
-    Serial.println("What?");
+    Serial.println("> What?");
   }     
 }
 // Process serial monitor commands
@@ -125,7 +125,7 @@ void processSerialCommandInput() {
       Serial.println(sLog);
     }
     else{
-      Serial.println("Try again in a bit.");
+      Serial.println("> No log yet.");
     }
   }  
 }
@@ -154,6 +154,7 @@ void logData(){
 }
 // Returns time as string
 String getTimeString(){
+  // This is UTC time. You may want to make changes to match your time zone.
   String sTime = String( day() ) + " " + monthShortStr( month() ) + " " + String( year() ) + " " + String( hour() ) + convertDigits( minute() ) + convertDigits( second() );
   return sTime;
 }
