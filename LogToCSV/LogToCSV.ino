@@ -1,22 +1,27 @@
 /*
   Log environmental data to CSV
  
-  This sketch sents values temperature, humidity, CO2 and the digital filter setting to the serial port in CSV format.
-  After uploading, open the serial monitor (ctrl+shift+m) and follow instructions. The CSV data can be copied and pasted into a spreadsheet.
-  In order to keep memory and storage consumption low, but not average out extremes, the sketch polls more frequently than it logs.
-  As the log is kept in RAM, only a around 9 data points can be recorded. As opening the serial monitor resets the Arduino, logs can only be read if the computer is connected the whole logging period. Until I have a datalogger shield, it's something at least.
-  When memory is full, logs are no longer saved. Some messy last entries may show up.
+  This sketch sents values temperature, humidity, CO2 and the digital filter
+  setting to the serial port in CSV format. After uploading, open the serial
+  monitor (ctrl+shift+m) and follow instructions. The CSV data can be copied
+  and pasted into a spreadsheet. In order to keep memory and storage
+  consumption low, but not average out extremes, the sketch polls more
+  frequently than it logs. As the log is kept in RAM, only a around 9 data
+  points can be recorded. As opening the serial monitor resets the Arduino,
+  logs can only be read if the computer is connected during the whole logging
+  period. Depending on your computer, you may put it on standby. Just don't
+  reset the serial connection. When memory is full, logs are no longer saved.
+  Some messy last entries may show up.
 
   created 13 Feb 2015
   by Koos Looijesteijn
  
   This code is in the public domain.
  	 
-  Upon first use, the sensor must be calibrated. If you don't get proper readings, do this:
-  1) Upload the SetToPolling sketch - Because the library is made for polling.
-  2) Move the sensor to an area with fresh air
-  3) Upload the Calibrate sketch
-  4) Upload this sketch again.
+  Upon first use, the sensor must be calibrated. If you don't get proper
+  readings, do this: 1) Upload the SetToPolling sketch - Because the library
+  is made for polling. 2) Move the sensor to an area with fresh air 3) Upload
+  the Calibrate sketch 4) Upload this sketch again.
   
   For logging in Fahrenheit, just replace all instances of 'Celsius'.
 */
@@ -38,17 +43,14 @@ SoftwareSerial nss(2,3); // Pin 2 = Arduino receiver pin (Rx), connect to sensor
 COZIR czr(nss);
 
 // We poll more often than we log, so we can register some extremes occurring during the logging intervals without having to log huge amounts of data.
-const int LOG_INTERVAL = 60; // In seconds. This defines how much time is between each log. It's not accurate.
-const byte MEASUREMENTS_PER_LOG = 10;
-// Set measure and log intervals
-const int POLLING_INTERVAL = LOG_INTERVAL / MEASUREMENTS_PER_LOG; // In seconds. This number can stay high. It takes about 30s for big changes even to be picked up as a small difference by the sensor.
-byte pollingLoopCounter = 0;
-byte logLoopCounter = 0;
+const int LOG_INTERVAL = 60*60; // Seconds between each log. 
+const byte POLLS_PER_LOG = 5; // Number of polls per logged entry.
+const int POLLING_INTERVAL = LOG_INTERVAL / POLLS_PER_LOG; // In seconds. This number can stay high. It takes about 30s for big changes even to be picked up as a small difference by the sensor.
 
 // Special declaration for variables that are averaged with the Average library.
-Average<float> temperatures(MEASUREMENTS_PER_LOG);
-Average<float> humidity(MEASUREMENTS_PER_LOG);
-Average<int> CO2(MEASUREMENTS_PER_LOG);
+Average<float> temperatures(POLLS_PER_LOG);
+Average<float> humidity(POLLS_PER_LOG);
+Average<int> CO2(POLLS_PER_LOG);
 
 // This will contain the log:
 String sLog;
@@ -58,7 +60,6 @@ String sLog;
 /****************************/
 void setup(){
   Serial.begin(9600); // Start communication over serial port.
-  //setSyncProvider( requestSync );  //set function to call when sync required
   Serial.println("\r\n> Please enter the current Unix time, for instance: 1420070400\r\n");// You can find the current time stamp on unixtimestamp.com
 }
 
@@ -66,28 +67,29 @@ void setup(){
  Loop
 /****************************/
 void loop(){
+  static unsigned long pollMoment;
+  static byte polls;
 
-  if (timeStatus() == timeSet) {
-    if ( pollingLoopCounter == POLLING_INTERVAL ){
+  if (timeStatus() == timeSet) { // Wait for time stamp before doing anything else
+    if ( millis() >= pollMoment + (unsigned long)POLLING_INTERVAL * 1000UL) { // Checking clock with millis() is more accurate than counting loops. Because the numbers can get large, they are converted to UL.
+      pollMoment = millis(); // millis() returns the number of milliseconds that passed since the processor started.
       pollData();
-      pollingLoopCounter = 0;
+      polls++;
     }
-    pollingLoopCounter++;
-    if ( logLoopCounter == LOG_INTERVAL ){
+    if ( polls == POLLS_PER_LOG ){
       logData();
-      logLoopCounter = 0;
+      polls = 0;
     }
-    logLoopCounter++;
     if (Serial.available()) {
       processSerialCommandInput();   
     }
   }
-  else {
+  else { 
     if (Serial.available()) {
       processDateInput();   
     }
   }
-  delay(1000);
+  delay(100); // Delay prevents serial commands getting chopped up in separate characters.
 }
 
 /****************************
@@ -101,10 +103,12 @@ void processDateInput() {
   Serial.println("- " + String(pctime) + "\r\n");
   if( pctime >= DEFAULT_TIME ){ // check the integer is a valid time (greater than Jan 1 2013)
     setTime(pctime); // Sync Arduino clock to the time received on the serial port
-    Serial.println("> Tnx, logging will start. Type 'csv' to get the log data.\r\n");
+    Serial.println("> Thanks. I believe you when you say it's " + getTimeString() +".");
+    delay(4000); // Sensor needs a couple of seconds to calibrate.
+    Serial.println("> Logging will start now.\r\n");
   }
   else{
-    Serial.println("> What?");
+    Serial.println("> Is that a time stamp?");
   }     
 }
 // Process serial monitor commands
@@ -125,7 +129,7 @@ void processSerialCommandInput() {
       Serial.println(sLog);
     }
     else{
-      Serial.println("> No log yet.");
+      Serial.println("> No log yet.\r\n");
     }
   }  
 }
@@ -138,6 +142,10 @@ void pollData(){
 }
 // Logging of measurements
 void logData(){
+  // Give feedback when first log is made and can be requsted.
+  if (sLog.length() == 0){
+    Serial.println("> Type 'csv' to get the log data.\r\n");
+  }
   String sTime = getTimeString();
   // Get for temperature, humidity and CO2 the lowest, average and highest measurements of the last logging interval:
   String sTemperatureMin = floatToString( temperatures.minimum() );
