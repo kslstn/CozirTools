@@ -36,10 +36,10 @@ void loop()
   int digi = czr.GetDigiFilter();
 
   Serial.print("Celsius : ");Serial.println(t);
-  Serial.print("Fahrenheit : ");Serial.println(f);
+  //Serial.print("Fahrenheit : ");Serial.println(f);
   Serial.print("Humidity : ");Serial.println(h);
   Serial.print("CO2 : ");Serial.println(c);
-  Serial.print("Digital Filter : ");Serial.println(digi); 
+  //Serial.print("Digital Filter : ");Serial.println(digi); 
   Serial.println("");
 }
 
