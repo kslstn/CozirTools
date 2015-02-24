@@ -24,7 +24,8 @@ Streaming is the factory default.
 
 #Dependencies#
 - The tools use [Rob Tillaart's Cozir Library](https://github.com/RobTillaart/Arduino/tree/master/libraries/Cozir).
-- The logger tools require the [Time library](https://github.com/PaulStoffregen/Time)
 - The loggers also need the [Average library](https://github.com/MajenkoLibraries/Average).
+- The LogToSD tool requires a DataLogger shield and [this RTC library](https://github.com/jcw/rtclib).
+- The LogToCSV tool for logging without DataShield requires the [Time library](https://github.com/PaulStoffregen/Time)
 
 [To install](arduino.cc/en/Guide/Libraries) libraries, download it to your Arduino/library folder and restart the Arduino IDE. 
