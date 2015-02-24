@@ -44,7 +44,7 @@ COZIR czr(nss);
 
 // We poll more often than we log, so we can register some extremes occurring during the logging intervals without having to log huge amounts of data.
 const int LOG_INTERVAL = 3; //60*60; // Seconds between each log. TODO
-const byte POLLS_PER_LOG = 2; // Number of polls per logged entry.
+const byte POLLS_PER_LOG = 2; // Number of polls per logged entry. Byte -> max 7.
 const int POLLING_INTERVAL = LOG_INTERVAL / POLLS_PER_LOG; // In seconds. This number can stay high. It takes about 30s for big changes even to be picked up as a small difference by the sensor.
 
 // Special declaration for variables that are averaged with the Average library.
@@ -62,7 +62,7 @@ void setup(){
   pinMode(10, OUTPUT);
 
   if (!SD.begin(chipSelect)) { // see if the card is present and can be initialized:
-    Serial.println("Card failed, or not present");
+    Serial.println(F("Card failed, or not present"));
     return; // don't do anything more.
   }
 
@@ -91,21 +91,7 @@ void loop(){
 /****************************
  Functions called from Loop
 /****************************/
-// Returns time as string
-String getTimeString(){
-  DateTime now = RTC.now();
-  String sTime = convertDigits( now.day() ) + "-" + convertDigits( now.month() ) + "-" + now.year() + " " + now.hour() +  ":" + convertDigits( now.minute() ) + ":" + convertDigits( now.second() );
-  return sTime;
-}
-// Digital time formatting: returns preceding colon and leading 0
-String convertDigits(int digits) {
-  String d;
-  if(digits < 10){
-    d += 0;
-  }
-  d += digits;
-  return d;
-}
+
 // Converts floats into strings.
 String floatToString(float f){
   char buff[10];
@@ -120,66 +106,95 @@ void pollData(){
   temperatures.push(czr.Celsius());
   humidity.push(czr.Humidity());
   CO2.push(czr.CO2());
+  return;
 }
 // Logging of measurements
 void logData(){
-  // String tableHeader = "Time,Temperature (low),Temperature,Temperature (high),Humidity (low),Humidity,Humidity (high),CO2 (low),CO2,CO2 (high)";
-  // String sTime = getTimeString();
-
-  // // Get the lowest, average and highest measurements of the last logging interval for temperature, humidity and CO2:
-  // String sTemperatureMin = floatToString( temperatures.minimum() );
-  // String sTemperatureAvg = floatToString( temperatures.mean() );
-  // String sTemperatureMax = floatToString( temperatures.maximum() );
-  // String sHumidityMin = floatToString( humidity.minimum() );
-  // String sHumidityAvg = floatToString( humidity.mean() );
-  // String sHumidityMax = floatToString( humidity.maximum() );
-  // String sCO2Min = floatToString( CO2.minimum() );
-  // String sCO2Avg = floatToString( CO2.mean() );
-  // String sCO2Max = floatToString( CO2.maximum() );
-
-  // // Combine all values in a string.
-  // String dataString = sTime + "," + sTemperatureMin + "," + sTemperatureAvg + "," + sTemperatureMax + "," + sHumidityMin + "," + sHumidityAvg + "," + sHumidityMax + "," + sCO2Min + "," + sCO2Avg + "," + sCO2Max; // Append all measurements to the string
-
-  Serial.println("opening dataFile");
   File dataFile;
   dataFile = SD.open("datalog.csv", FILE_WRITE);// Create file if it doesn't already exist.
   dataFile.close();
   dataFile = SD.open("datalog.csv"); // Open the file
   if (dataFile) {
-    char chars[3];
-    String content;
-    int i = 0;
-    while( i < 3 ){
-      chars[i] = dataFile.read();
-      int j = chars[i];
-
-      Serial.println( "chars[i]: ");
-      Serial.println( chars[i] );
-      if (j != -1){ // When end of file is reached, -1 is returned.
-        content += String(chars[i]);
-        Serial.println( "content: ");
-        Serial.println( content );
-      }
-      i++;
-    }
-    if (content.length() == 0){
-      Serial.println("File is empty, adding header");
-      dataFile.close();
-      dataFile = SD.open("datalog.csv", FILE_WRITE);
-      dataFile.println("hoi");
-    }
-    if (content == "hoi"){
-      Serial.println("File has header.");
-      dataFile.close();
-      dataFile = SD.open("datalog.csv", FILE_WRITE);
-      dataFile.println("doeg!");
-    }
-    if ((content != "hoi") && (content.length() > 0)){
-      Serial.println("datalog.csv has unexpected contents. Logging won't start.");
-    }
+    String content = getFirstWord(dataFile);
     dataFile.close();
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening datalog.csv");
+    if (content.length() == 0){
+      addTableHeader(dataFile);     
+    }
+    if (content == "Time"){
+      logToSD(dataFile);
+    }
+    if ((content != "Time") && (content.length() > 0)){
+      Serial.println(F("Something's wrong with datalog.csv"));
+    }
   }
+  else {
+    // if the file didn't open, print an error:
+    Serial.println(F("error opening datalog.csv"));
+  }
+  return; // Close the function to free up memory.
+}
+String getFirstWord(File dataFile){
+  char chars[4];
+  String content;
+  byte i = 0;
+  while( i < 4 ){
+    chars[i] = dataFile.read();
+    int j = chars[i];
+    if (j != -1){ // When end of file is reached, -1 is returned.
+      content += String(chars[i]);
+    }
+    i++;
+  }
+  return content;
+}
+void addTableHeader(File dataFile){
+  dataFile = SD.open("datalog.csv", FILE_WRITE);
+  dataFile.println(F("Time,Temperature (low),Temperature,Temperature (high),Humidity (low),Humidity,Humidity (high),CO2 (low),CO2,CO2 (high)"));
+  dataFile.close();
+  return;
+}
+void logToSD(File dataFile){
+  dataFile = SD.open("datalog.csv", FILE_WRITE);
+
+  DateTime now = RTC.now();
+
+  if ( now.day() < 10 ){
+    dataFile.print(F("0"));
+  }
+  dataFile.print(now.day(), DEC);
+  dataFile.print(F("-"));
+  if ( now.month() < 10 ){
+    dataFile.print(F("0"));
+  }
+  dataFile.print(now.month(), DEC);
+  dataFile.print(F("-"));
+  dataFile.print(now.year(), DEC);
+  dataFile.print(F(" "));
+  if ( now.hour() < 10 ){
+    dataFile.print(F("0"));
+  }  
+  dataFile.print(now.hour(), DEC);
+  dataFile.print(F(":"));
+  if ( now.minute() < 10 ){
+    dataFile.print(F("0"));
+  }  
+  dataFile.print(now.minute(), DEC);
+  dataFile.print(F(":"));
+  if ( now.second() < 10 ){
+    dataFile.print(F("0"));
+  }
+  dataFile.print(now.second(), DEC);
+  dataFile.print(F(","));
+  dataFile.print(floatToString(temperatures.minimum()) + ",");  
+  dataFile.print(floatToString(temperatures.mean()) + ",");  
+  dataFile.print(floatToString(temperatures.maximum()) + ",");  
+  dataFile.print(floatToString(humidity.minimum()) + ",");  
+  dataFile.print(floatToString(humidity.mean()) + ",");  
+  dataFile.print(floatToString(humidity.maximum()) + ",");  
+  dataFile.print(floatToString(CO2.minimum()) + ",");  
+  dataFile.print(floatToString(CO2.mean()) + ",");
+  dataFile.print(floatToString(CO2.maximum()) + "\r\n"); 
+  
+  dataFile.close();
+  return;
 }
