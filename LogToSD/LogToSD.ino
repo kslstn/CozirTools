@@ -51,7 +51,7 @@ float humidity[3];
 float CO2[3];// To prevent rouding errors adding up in the average, the CO2 int data is converted to float.
 
 // Count number of polls per log to calculate average temperature during log period. As you may start polling in the middle of a logging period, the number of polls in a log can be lower than 5.
-int pollsInLog;
+int pollsInLog = 0;
 
 /****************************
  Setup
@@ -61,9 +61,8 @@ void setup(){
   pinMode(10, OUTPUT);
 
   if (!SD.begin(chipSelect)) {// see if the card is present and can be initialized:
-    Serial.println(F("Card failed, or not present"));
+    Serial.println(F("Something's wrong with SD card"));
   }
-
   delay(5000);// Sensor startup time.
 }
 
@@ -78,18 +77,17 @@ void loop(){
   static int lastPoll;// last poll moment
   static int lastLog;// last log moment
   
-  // Poll often
-  if (currentMinute > lastPoll + 1){// TODO
+  // Poll every minute
+  if ((currentMinute - lastPoll < 59) && (currentMinute > lastPoll)){
     pollData();
-    if (currentMinute > 56){
+    lastPoll = currentMinute;      
+    if (currentMinute >= 59){
       lastPoll = 0;
-    }
-    else{
-      lastPoll = currentMinute;      
     }
   }
   // Log every 15 minutes
   if (((currentMinute == 15) || (currentMinute == 30) || (currentMinute == 45) || (currentMinute == 0)) && (currentMinute != lastLog)){ 
+  //if ((currentMinute > lastLog + 2) && (currentMinute != lastLog)){ 
     logData(currentTime);
     lastLog = currentMinute;
   }
@@ -184,9 +182,8 @@ void writeToSD(File dataFile, tmElements_t currentTime){
   dataFile.print(floatToString(humidity[2]) + ",");  
   dataFile.print(floatToString(CO2[0]) + ",");  
   dataFile.print(floatToString(CO2[1]) + ",");
-  dataFile.print(floatToString(CO2[2]) + "\r\n"); 
-  dataFile.print(floatToString(CO2[1]) + ",");  
-  dataFile.print(floatToString(pollsInLog));  
+  dataFile.print(floatToString(CO2[2]) + ",");  
+  dataFile.print(String(pollsInLog) + "\r\n");
 
   dataFile.close();
   resetPolls();//Erase the values of the interval that is now saved to the file.  
